@@ -117,6 +117,7 @@ const config = {
   marketoMunchkinID: '345-TTI-184',
 };
 
+
 (async function loadLCPImage() {
   const lcpImg = document.querySelector('img');
   lcpImg?.setAttribute('loading', 'eager');
