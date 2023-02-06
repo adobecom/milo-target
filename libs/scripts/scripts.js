@@ -127,6 +127,7 @@ const config = {
 (async function loadLCPImage() {
   const lcpImg = document.querySelector('img');
   lcpImg?.setAttribute('loading', 'eager');
+  lcpImg?.setAttribute('fetchpriority', 'high');
 }());
 
 (async function loadPage() {
