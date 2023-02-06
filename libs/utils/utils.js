@@ -638,6 +638,7 @@ const loadIms = () => {
 };
 
 const getExperiment = async () => {
+  return {};
   if (navigator.userAgent.match(/bot|crawl|spider/i)) {
     return {};
   }

@@ -121,6 +121,14 @@ const config = {
 (async function loadLCPImage() {
   const lcpImg = document.querySelector('img');
   lcpImg?.setAttribute('loading', 'eager');
+  lcpImg?.setAttribute('fetchpriority', 'high');
+  // const link = document.createElement('link');
+  // link.setAttribute('rel', 'preload');
+  // link.setAttribute('fetchpriority', 'high');
+  // link.setAttribute('as', 'image');
+  // link.setAttribute('href', lcpImg.src);
+  // link.setAttribute('type', 'image/webp');
+  // document.head.appendChild(link);
 }());
 
 (async function loadPage() {
