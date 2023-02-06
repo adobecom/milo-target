@@ -421,16 +421,21 @@ class Gnav {
 
     const { locale, imsClientId, env, onReady } = getConfig();
     if (!imsClientId) return null;
-    window.adobeid = {
-      client_id: imsClientId,
-      scope: 'AdobeID,openid,gnav',
-      locale: locale || 'en-US',
-      autoValidateToken: true,
-      environment: env.ims,
-      useLocalStorage: false,
-      onReady: onReady || defaultOnReady,
-    };
-    loadScript('https://auth.services.adobe.com/imslib/imslib.min.js');
+
+    if (!window.adobeIMS) {
+      window.adobeid = {
+        client_id: imsClientId,
+        scope: 'AdobeID,openid,gnav',
+        locale: locale || 'en-US',
+        autoValidateToken: true,
+        environment: env.ims,
+        useLocalStorage: false,
+        onReady: onReady || defaultOnReady,
+      };
+      loadScript('https://auth.services.adobe.com/imslib/imslib.min.js');
+    } else if (!onReady) {
+      defaultOnReady();
+    }
     return profileEl;
   };
 
