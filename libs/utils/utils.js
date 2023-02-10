@@ -798,7 +798,8 @@ export function loadDelayed(delay = 3000) {
       }
       import('./samplerum.js').then(({ sampleRUM }) => sampleRUM('cwv'));
 
-      if ((window.location.hostname.endsWith('hlx.page') || window.location.hostname === ('localhost')) && window.hlx.experiment) {
+      const query = new URL(window.location.href).searchParams.get('preview');
+      if (query !== 'off' && (window.location.hostname.endsWith('hlx.page') || window.location.hostname === ('localhost')) && window.hlx.experiment) {
         import('../scripts/preview/preview.js');
       }
     }, delay);
