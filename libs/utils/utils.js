@@ -555,8 +555,18 @@ function decorateSections(el, isDoc) {
 async function loadMartech(config) {
   const query = new URL(window.location.href).searchParams.get('martech');
   if (query !== 'off' && getMetadata('martech') !== 'off') {
+    // disable target hiding
+    window.targetGlobalSettings = { bodyHidingEnabled: false };
+    loadIms();
+    performance.mark('before-martech-load');
     const { default: martech } = await import('../martech/martech.js');
+    performance.mark('after-martech-load');
+    const p = performance.measure('loadmartech', 'before-martech-load', 'after-martech-load');
+    console.log('loadmartech', p.duration);
     await martech(config, loadScript, getMetadata);
+    performance.mark('after-martech-call');
+    const r = performance.measure('runmartech', 'after-martech-load', 'after-martech-call');
+    console.log('runmartech', r.duration);
   }
 }
 
@@ -609,21 +619,9 @@ function initSidekick() {
   }
 }
 
-const handleAlloyResponse = (response) => {
-  const item = (response.decisions || response.propositions)?.[0]?.items?.[0];
-
-  if (item?.data?.content?.Experiments) {
-    return {
-      experimentPath: item.data.content.Experiments,
-      experimentName: item.meta['activity.name'],
-      variant: item.meta['experience.name'],
-    };
-  }
-
-  return {};
-};
-
 const loadIms = () => {
+  if (window.adobeIMS) return;
+
   const { locale, imsClientId, env, onReady } = getConfig();
   window.adobeid = {
     client_id: imsClientId,
@@ -634,39 +632,71 @@ const loadIms = () => {
     useLocalStorage: false,
     onReady: onReady,
   };
+  console.log('loadims');
   loadScript('https://auth.services.adobe.com/imslib/imslib.min.js');
 };
 
-const getExperiment = async () => {
+const handleAlloyResponse = (response) => {
+  const items = (response.decisions || response.propositions)?.[0]?.items;
+  if (!items) return [];
+  // loop through items for each manifest info
+
+  return items
+    .map((item) => {
+      if (item?.data?.content?.experiment) {
+        return {
+          experimentPath: item.data.content.experiment,
+          manifestData: item.data.content.manifest,
+          experimentName: item.meta['activity.name'],
+          variantLabel: item.meta['experience.name'],
+        };
+      }
+      return null;
+    })
+    .filter((item) => item !== null);
+};
+
+const getExperiments = async () => {
   if (navigator.userAgent.match(/bot|crawl|spider/i)) {
     return {};
   }
-  loadIms();
   const response = await alloy_load.sent;
-  const {
-    experimentPath,
-    experimentName,
-    variant,
-  } = handleAlloyResponse(response);
+  console.log(response);
 
-  if (!experimentPath) {
-    experimentPath = getMetadata('experiment')?.toLowerCase();
+  // {
+  //   experimentPath,
+  //   experimentName,
+  //   variant,
+  // }
+  let experiments = handleAlloyResponse(response);
+
+  if (!experiments?.length) {
+    experiments = [{
+      experimentPath: getMetadata('experiment')?.toLowerCase(),
+    }];
   }
+
   const instantExperiment = getMetadata('instant-experiment')?.toLowerCase();
 
   return {
-    experimentPath,
+    experiments,
     instantExperiment,
-    variant,
   };
 };
 
 const checkForExperiments = async () => {
-  const { experimentPath, instantExperiment, variant } = await getExperiment();
-  if (!experimentPath || !variant) return null;
-
+  const { experiments, instantExperiment } = await getExperiments();
+  const {
+    experimentPath,
+    experimentName,
+    manifestData,
+    variantLabel,
+  } = experiments[0]; // TODO: Support multiple experiments
+  if (!experimentPath || !variantLabel) return null;
+  performance.mark('start-runexperiment');
   const { runExperiment } = await import('../scripts/experiments.js');
-  const experiment = await runExperiment(experimentPath, variant, instantExperiment, document.querySelector('main'), createTag);
+  const experiment = await runExperiment(experimentPath, variantLabel, manifestData,instantExperiment, document.querySelector('main'), createTag);
+  performance.mark('finish-runexperiment');
   console.log('experiment: ', experiment);
   return experiment;
 };
@@ -675,12 +705,18 @@ export async function loadArea(area = document) {
   const isDoc = area === document;
 
   const config = getConfig();
-  await loadMartech(config);
+
+
   if (isDoc) {
+    await loadMartech(config);
     const experiment = await checkForExperiments();
     if (experiment) {
       setConfig({ ...getConfig(), experiment });
     }
+    const beforeExp = performance.measure('before-running-exp', 'loadpage', 'start-runexperiment');
+    const runExp = performance.measure('runexperiment', 'start-runexperiment', 'finish-runexperiment');
+    console.log('beforeExp', beforeExp.duration);
+    console.log('runExp', runExp.duration);
   }
 
 
@@ -720,6 +756,7 @@ export async function loadArea(area = document) {
 
   // Post section loading on document
   if (isDoc) {
+    console.log('georouting');
     const georouting = getMetadata('georouting') || config.geoRouting;
     if (georouting === 'on') {
       const { default: loadGeoRouting } = await import('../features/georouting/georouting.js');
@@ -730,6 +767,7 @@ export async function loadArea(area = document) {
       const { addRichResults } = await import('../features/richresults.js');
       addRichResults(type, { createTag, getMetadata });
     }
+    console.log('load-footer');
     loadFooter();
     const { default: loadFavIcon } = await import('./favicon.js');
     loadFavIcon(createTag, getConfig(), getMetadata);
@@ -756,9 +794,9 @@ export function loadDelayed(delay = 3000) {
       }
       import('./samplerum.js').then(({ sampleRUM }) => sampleRUM('cwv'));
 
-      // if (window.location.hostname.endsWith('hlx.page') || window.location.hostname === ('localhost')) {
-      //   import('../scripts/preview/preview.js');
-      // }
+      if (window.location.hostname.endsWith('hlx.page') || window.location.hostname === ('localhost')) {
+        import('../scripts/preview/preview.js');
+      }
     }, delay);
   });
 }
