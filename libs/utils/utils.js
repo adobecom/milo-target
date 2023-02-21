@@ -609,6 +609,10 @@ function decorateFooterPromo(config) {
 }
 
 async function loadMartech(config) {
+  if (window.marketingtech?.adobe?.launch !== undefined) {
+    return true;
+  }
+
   const query = new URL(window.location.href).searchParams.get('martech');
   if (query !== 'off' && getMetadata('martech') !== 'off') {
     // disable target hiding
@@ -667,6 +671,7 @@ async function loadMartech(config) {
 }
 
 async function loadPostLCP(config) {
+  loadMartech();
   const header = document.querySelector('header');
   if (header) {
     header.classList.add('gnav-hide');
@@ -906,7 +911,7 @@ export async function loadArea(area = document) {
   const config = getConfig();
 
 
-  if (isDoc) {
+  if (isDoc && getMetadata('experiment') === 'on') {
     const martechIsRunning = await loadMartech(config);
     if (martechIsRunning) {
       const experiment = await checkForExperiments();
