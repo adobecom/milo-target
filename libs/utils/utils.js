@@ -237,6 +237,21 @@ export function loadStyle(href, callback) {
   return link;
 }
 
+export function preload(href, { rel = 'preload', as = 'script', crossorigin = false } = {}) {
+  let link = document.head.querySelector(`link[href="${href}"]`);
+  if (!link) {
+    link = document.createElement('link');
+    link.setAttribute('rel', rel);
+    link.setAttribute('as', as);
+    if (crossorigin !== false) {
+      link.setAttribute('crossorigin', crossorigin);
+    }
+    link.setAttribute('href', href);
+    document.head.appendChild(link);
+  }
+  return link;
+}
+
 export function appendHtmlPostfix(area = document) {
   const pageUrl = new URL(window.location.href);
   if (!pageUrl.pathname.endsWith('.html')) return;
@@ -552,6 +567,22 @@ function decorateSections(el, isDoc) {
   });
 }
 
+const loadIms = () => {
+  if (window.adobeIMS) return;
+
+  const { locale, imsClientId, env, onReady } = getConfig();
+  window.adobeid = {
+    client_id: imsClientId,
+    scope: 'AdobeID,openid,gnav',
+    locale: locale || 'en-US',
+    autoValidateToken: true,
+    environment: env.ims,
+    useLocalStorage: false,
+    onReady,
+  };
+  loadScript('https://auth.services.adobe.com/imslib/imslib.min.js');
+};
+
 async function loadMartech(config) {
   if (window.marketingtech?.adobe?.launch !== undefined) {
     return true;
@@ -563,7 +594,7 @@ async function loadMartech(config) {
     window.targetGlobalSettings = { bodyHidingEnabled: false };
     loadIms();
 
-    function getDetails(env) {
+    const getDetails = (env) => {
       /* c8 ignore start */
       if (env.name === 'prod') {
         return {
@@ -576,10 +607,11 @@ async function loadMartech(config) {
         edgeConfigId: env.consumer?.edgeConfigId || env.edgeConfigId,
       };
       /* c8 ignore stop */
-    }
+    };
 
-    async function martech(config) {
+    const martech = async () => {
       const { url, edgeConfigId } = getDetails(config.env);
+      preload(url);
       window.alloy_load ??= {};
       window.alloy_load.data ??= {};
       window.alloy_all ??= {};
@@ -606,9 +638,9 @@ async function loadMartech(config) {
 
       await loadScript('/libs/deps/martech.main.standard.min.js');
       _satellite.track('pageload');
-    }
+    };
 
-    await martech(config);
+    await martech();
     return true;
   }
   return false;
@@ -663,28 +695,11 @@ function initSidekick() {
   }
 }
 
-const loadIms = () => {
-  if (window.adobeIMS) return;
-
-  const { locale, imsClientId, env, onReady } = getConfig();
-  window.adobeid = {
-    client_id: imsClientId,
-    scope: 'AdobeID,openid,gnav',
-    locale: locale || 'en-US',
-    autoValidateToken: true,
-    environment: env.ims,
-    useLocalStorage: false,
-    onReady: onReady,
-  };
-  console.log('loadims');
-  loadScript('https://auth.services.adobe.com/imslib/imslib.min.js');
-};
-
 const handleAlloyResponse = (response) => {
   const items = response.propositions?.[0]?.items
     || response.decisions?.[0]?.items;
 
-    if (!items) return [];
+  if (!items) return [];
   // loop through items for each manifest info
 
   return items
@@ -720,25 +735,22 @@ const getExperiments = async () => {
         experimentPath: experimentParam.substring(0, lastSlash),
         variantLabel: experimentParam.substring(lastSlash + 1)
       }],
-    }
+    };
   }
 
   const timeout = new Promise((resolve) => {
-    console.log('starting timeout')
-    setTimeout(() => {console.log('TIMEOUT!'); resolve()}, EXPERIMENT_TIMEOUT_MS, false);
+    setTimeout(() => resolve('TIMEOUT'), EXPERIMENT_TIMEOUT_MS, false);
   });
 
   let response = false;
   try {
-    console.log('Awaiting Alloy');
     response = await Promise.race([alloy_load.sent, timeout]);
-    console.log('ALLOY RESPONSE', response);
+    console.log('ALLOY RESPONSE:', response);
   } catch (e) {
-    console.log('Promise error', e)
+    console.log('Promise error', e);
   }
 
-  console.log('RESPONSE', response)
-  if (!response) return {};
+  if (!response || response === 'TIMEOUT') return {};
 
   let experiments = handleAlloyResponse(response);
 
@@ -768,7 +780,7 @@ const checkForExperiments = async () => {
   if (!manifestData || !variantLabel) return null;
   performance.mark('start-runexperiment');
   const { runExperiment } = await import('../scripts/experiments.js');
-  const experiment = await runExperiment(experimentPath, variantLabel, manifestData,instantExperiment, document.querySelector('main'), createTag);
+  const experiment = await runExperiment(experimentPath, variantLabel, manifestData, instantExperiment, document.querySelector('main'), createTag);
   performance.mark('finish-runexperiment');
   console.log('experiment: ', experiment);
   return experiment;
@@ -779,17 +791,16 @@ export async function loadArea(area = document) {
 
   const config = getConfig();
 
-
   if (isDoc && getMetadata('experiment') === 'on') {
     const martechIsRunning = await loadMartech(config);
     if (martechIsRunning) {
+      preload('/libs/scripts/experiments.js', { crossorigin: 'use-credentials' });
       const experiment = await checkForExperiments();
       if (experiment) {
         setConfig({ ...getConfig(), experiment });
       }
     }
   }
-
 
   appendHtmlPostfix(area);
   await decoratePlaceholders(area, config);
@@ -902,14 +913,12 @@ export function loadLana(options = {}) {
   if (window.lana) return;
 
   const lanaError = (e) => {
-    window.lana.log(e.reason || e.error || e.message, {
-      errorType: 'i',
-    });
-  }
+    window.lana.log(e.reason || e.error || e.message, { errorType: 'i' });
+  };
 
   window.lana = {
     log: async (...args) => {
-      await import('../utils/lana.js');
+      await import('./lana.js');
       window.removeEventListener('error', lanaError);
       window.removeEventListener('unhandledrejection', lanaError);
       return window.lana.log(...args);
