@@ -7,7 +7,20 @@ const COMMANDS = {
   remove: (el) => el.remove(),
 };
 
-const handleCommands = (cmdList, control, selectedVariant, createTag) => {
+const COMMANDSHTML = {
+  before: (el, html) => el.insertAdjacentHTML('beforebegin', html),
+  after: (el, html) => el.insertAdjacentHTML('afterend', html),
+  replace: (el, html) => (el.outerHTML = html),
+  remove: (el) => el.remove(),
+};
+
+const handleCommands = (
+  cmdList,
+  control,
+  selectedVariant,
+  createTag,
+  content
+) => {
   const createFragment = (url) => {
     const a = createTag('a', { href: url }, url);
     const p = createTag('p', undefined, a);
@@ -31,9 +44,15 @@ const handleCommands = (cmdList, control, selectedVariant, createTag) => {
     const i = nameIndex[name] === undefined ? 0 : nameIndex[name] + 1;
     nameIndex[name] = i;
 
-    if (validCommands.includes(cmd) && control[name][i] && selectedVariant[name][i]) {
+    if (
+      validCommands.includes(cmd) &&
+      control[name][i] &&
+      selectedVariant[name][i]
+    ) {
       let targetEls;
-      const query = control[name][i].startsWith('.') ? control[name][i] : `.${control[name][i]}`;
+      const query = control[name][i].startsWith('.')
+        ? control[name][i]
+        : `.${control[name][i]}`;
       if (all) {
         targetEls = [...mainEl.querySelectorAll(query)];
       } else {
@@ -50,7 +69,14 @@ const handleCommands = (cmdList, control, selectedVariant, createTag) => {
 
       targetEls.forEach((el) => {
         if (!el) return;
-        COMMANDS[cmd](el, cmd !== 'remove' && createFragment(selectedVariant[name][i]));
+        if (cmd !== 'remove' && content[selectedVariant[name][i]]) {
+          COMMANDSHTML[cmd](el, content[selectedVariant[name][i]]);
+        } else {
+          COMMANDS[cmd](
+            el,
+            cmd !== 'remove' && createFragment(selectedVariant[name][i])
+          );
+        }
       });
     }
   });
@@ -140,7 +166,9 @@ export function parseExperimentConfig(json) {
         if (arrayProperties.includes(key)) {
           variants[camelVN][key] = variants[camelVN][key] || [];
           if (key === 'pages')
-            variants[camelVN][key].push(line[vn] ? new URL(line[vn]).pathname : '');
+            variants[camelVN][key].push(
+              line[vn] ? new URL(line[vn]).pathname : ''
+            );
           else variants[camelVN][key].push(line[vn]);
         } else {
           variants[camelVN][key] = line[vn];
@@ -149,16 +177,47 @@ export function parseExperimentConfig(json) {
     });
     config.variants = variants;
     config.variantNames = variantNames;
-    config.variantLabels = Object.entries(variants).reduce((labelMap, [variantName, variant]) => {
-      labelMap[variant.label] = variantName;
-      return labelMap;
-    }, {});
+    config.variantLabels = Object.entries(variants).reduce(
+      (labelMap, [variantName, variant]) => {
+        labelMap[variant.label] = variantName;
+        return labelMap;
+      },
+      {}
+    );
     return config;
   } catch (e) {
     // eslint-disable-next-line no-console
     console.log('error parsing experiment config:', e, json);
   }
   return null;
+}
+export function parseExperimentSupport(json) {
+  if (!json.experiences) return;
+  const sheets = {};
+  Object.entries(json).forEach(([sheetName, sheet]) => {
+    if (sheetName !== 'experiences' && !sheetName.startsWith(':')) {
+      try {
+        sheet.data.forEach((line) => {
+          const key = line.key;
+          Object.entries(line).forEach(([rowName, value]) => {
+            if (rowName !== 'key') {
+              if (!sheets[sheetName]) sheets[sheetName] = {};
+              if (rowName === 'value') {
+                sheets[sheetName][key] = value;
+              } else {
+                if (!sheets[sheetName][key]) sheets[sheetName][key] = {};
+                sheets[sheetName][key][rowName] = value;
+              }
+            }
+          });
+        });
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.log('error parsing experiment support:', e, json[sheet]);
+      }
+    }
+  });
+  return sheets;
 }
 
 export function isValidConfig(config) {
@@ -175,7 +234,9 @@ export function isValidConfig(config) {
         (v.percentageSplit === '' || !!v.percentageSplit)
     )
   ) {
-    console.warn('Invalid experiment config. Please review your sheet and parser.');
+    console.warn(
+      'Invalid experiment config. Please review your sheet and parser.'
+    );
     return false;
   }
   return true;
@@ -190,7 +251,9 @@ export function isValidConfig(config) {
 export async function replaceInner(path, element) {
   if (!path || !element) return false;
   let plainPath = path.endsWith('/') ? `${path}index` : path;
-  plainPath = plainPath.endsWith('.plain.html') ? plainPath : `${plainPath}.plain.html`;
+  plainPath = plainPath.endsWith('.plain.html')
+    ? plainPath
+    : `${plainPath}.plain.html`;
   try {
     const resp = await fetch(plainPath);
     if (!resp.ok) {
@@ -235,7 +298,9 @@ export function getConfigForInstantExperiment(experimentId, instantExperiment) {
     variantNames: [],
   };
 
-  const pages = instantExperiment.split(',').map((p) => new URL(p.trim()).pathname);
+  const pages = instantExperiment
+    .split(',')
+    .map((p) => new URL(p.trim()).pathname);
   const evenSplit = 1 / (pages.length + 1);
 
   config.variantNames.push('control');
@@ -276,7 +341,10 @@ export function getConfigForInstantExperiment(experimentId, instantExperiment) {
  * @param {object} cfg
  * @returns {object} containing the experiment manifest
  */
-export async function getConfigForFullExperiment(experiment = '', manifestData = undefined) {
+export async function getConfigForFullExperiment(
+  experiment = '',
+  manifestData = undefined
+) {
   const experimentId = experiment.includes('/')
     ? experiment.slice(experiment.lastIndexOf('/') + 1)
     : experiment;
@@ -312,11 +380,19 @@ export async function getConfigForFullExperiment(experiment = '', manifestData =
   return null;
 }
 
-export async function getConfig(experimentName, variantLabel, manifestData, instantExperiment) {
+export async function getConfig(
+  experimentName,
+  variantLabel,
+  manifestData,
+  instantExperiment
+) {
   let config;
   if (instantExperiment) {
     console.log('Instant Experiment: ', instantExperiment);
-    config = getConfigForInstantExperiment(experimentName || 'not defined', instantExperiment);
+    config = getConfigForInstantExperiment(
+      experimentName || 'not defined',
+      instantExperiment
+    );
   } else {
     console.log('Experiment: ', experimentName);
     config = await getConfigForFullExperiment(experimentName, manifestData);
@@ -341,14 +417,23 @@ export async function getConfig(experimentName, variantLabel, manifestData, inst
   return config;
 }
 
-const checkForPageReplacement = async (controlPages, selectedPages, id) => {
+const checkForPageReplacement = async (
+  controlPages,
+  selectedPages,
+  id,
+  content
+) => {
   if (!controlPages?.length || !selectedPages?.length) return;
 
   const currentPath = window.location.pathname;
   const index = controlPages.indexOf(currentPath);
   if (index >= 0 || selectedPages[index] !== currentPath) {
     document.body.classList.add(`experiment-${id}`);
-    await replaceInner(selectedPages[index], document.querySelector('main'));
+    if (content?.[selectedPages[index]]) {
+      document.querySelector('main').innerHTML = content[selectedPages[index]];
+    } else {
+      await replaceInner(selectedPages[index], document.querySelector('main'));
+    }
   }
 };
 
@@ -362,7 +447,8 @@ const swapFragments = (fragMap) => {
 };
 
 const convertToMap = (blockName, control, selectedVariant) => {
-  if (!control[blockName]?.length || !selectedVariant[blockName]?.length) return;
+  if (!control[blockName]?.length || !selectedVariant[blockName]?.length)
+    return;
   const blockMap = control[blockName].reduce((map, block, idx) => {
     if (block && selectedVariant[blockName][idx]) {
       map[block] = selectedVariant[blockName][idx];
@@ -380,22 +466,42 @@ export async function runExperiment(
   pageReplaceEl,
   createTag
 ) {
-  const experiment = await getConfig(experimentPath, variantLabel, manifestData, instantExperiment);
+  const experiment = await getConfig(
+    experimentPath,
+    variantLabel,
+    manifestData,
+    instantExperiment
+  );
   const { control } = experiment;
+  const supportData = parseExperimentSupport(manifestData);
 
-// Currently required for preview.js
-window.hlx ??= {};
-window.hlx.experiment = experiment;
+  // Currently required for preview.js
+  window.hlx ??= {};
+  window.hlx.experiment = experiment;
 
-  if (!experiment.selectedVariant || experiment.selectedVariantName === experiment.controlName) {
+  if (
+    !experiment.selectedVariant ||
+    experiment.selectedVariantName === experiment.controlName
+  ) {
     return;
   }
 
   const selectedVariant = experiment.selectedVariant;
-  await checkForPageReplacement(control.pages, selectedVariant.pages, experiment.id);
+  await checkForPageReplacement(
+    control.pages,
+    selectedVariant.pages,
+    experiment.id,
+    supportData.content
+  );
 
   // Handle block movement/replacement
-  handleCommands(experiment.names, control, selectedVariant, createTag);
+  handleCommands(
+    experiment.names,
+    control,
+    selectedVariant,
+    createTag,
+    supportData.content
+  );
 
   convertToMap('blocks', control, selectedVariant);
   convertToMap('fragments', control, selectedVariant);
