@@ -11,9 +11,6 @@
  */
 
 import { loadArea, loadDelayed, loadLana, setConfig } from '../utils/utils.js';
-import('../scripts/experiments.js');
-import('/libs/utils/decorate.js');
-import('/libs/martech/attributes.js');
 
 // Production Domain
 const prodDomains = ['milo.adobe.com'];
