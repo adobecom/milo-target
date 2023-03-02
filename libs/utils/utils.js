@@ -1,3 +1,4 @@
+import('../scripts/experiments.js');
 const MILO_TEMPLATES = ['404', 'featured-story'];
 const MILO_BLOCKS = [
   'accordion',
@@ -638,7 +639,6 @@ async function loadMartech(config) {
       window.digitalData.diagnostic.franklin = { implementation: 'milo' };
 
       await loadScript('/libs/deps/martech.main.standard.min.js');
-      loadScript('/libs/scripts/experiments.js');
       _satellite.track('pageload');
     }
 
