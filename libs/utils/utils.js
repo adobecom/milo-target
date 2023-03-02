@@ -638,6 +638,7 @@ async function loadMartech(config) {
       window.digitalData.diagnostic.franklin = { implementation: 'milo' };
 
       await loadScript('/libs/deps/martech.main.standard.min.js');
+      loadScript('/libs/scripts/experiments.js');
       _satellite.track('pageload');
     }
 
@@ -839,7 +840,6 @@ export async function loadArea(area = document) {
   const config = getConfig();
 
   if (isDoc && getMetadata('experiment') === 'on') {
-    loadScript('/libs/scripts/experiments.js');
     const martechIsRunning = await loadMartech(config);
     if (martechIsRunning) {
       const experiment = await checkForExperiments();
