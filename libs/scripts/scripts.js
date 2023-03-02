@@ -10,12 +10,8 @@
  * governing permissions and limitations under the License.
  */
 
-import {
-  loadArea,
-  loadDelayed,
-  loadLana,
-  setConfig,
-} from '../utils/utils.js';
+import { loadArea, loadDelayed, loadLana, setConfig } from '../utils/utils.js';
+import('../scripts/experiments.js');
 
 // Production Domain
 const prodDomains = ['milo.adobe.com'];
@@ -117,12 +113,11 @@ const config = {
   marketoMunchkinID: '345-TTI-184',
 };
 
-
 (async function loadLCPImage() {
   const lcpImg = document.querySelector('img');
   lcpImg?.setAttribute('loading', 'eager');
   lcpImg?.setAttribute('fetchpriority', 'high');
-}());
+})();
 
 (async function loadPage() {
   performance.mark('loadpage');
@@ -130,4 +125,4 @@ const config = {
   loadLana({ clientId: 'milo' });
   await loadArea();
   loadDelayed();
-}());
+})();

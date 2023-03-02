@@ -1,4 +1,3 @@
-import('../scripts/experiments.js');
 const MILO_TEMPLATES = ['404', 'featured-story'];
 const MILO_BLOCKS = [
   'accordion',
