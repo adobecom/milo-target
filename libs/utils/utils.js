@@ -860,7 +860,7 @@ export function loadDelayed(delay = 3000) {
       import('./samplerum.js').then(({ sampleRUM }) => sampleRUM('cwv'));
 
       const preview = new URL(window.location.href).searchParams.get('preview');
-      if (preview === 'on' && (window.location.hostname.endsWith('hlx.page') || window.location.hostname.includes('localhost')) && window.hlx.experiment) {
+      if (preview === 'on' && (window.location.hostname.endsWith('hlx.page') || window.location.hostname.includes('localhost')) && window.hlx.experiments) {
         import('../scripts/preview/preview.js');
       }
     }, delay);
